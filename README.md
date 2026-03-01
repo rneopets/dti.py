@@ -11,13 +11,13 @@ Some notes:
 This project will likely never be put on PyPI, so you'll have to install the development version, from this repo.
 
 ```sh
-python -m pip install -U git+https://github.com/diceroll123/dti.py
+python -m pip install -U git+https://github.com/rneopets/dti.py
 ```
 
 *Alternatively,*
 
 ```sh
-$ git clone https://github.com/diceroll123/dti.py
+$ git clone https://github.com/rneopets/dti.py
 $ cd dti.py
 $ python -m pip install -U .
 ```
