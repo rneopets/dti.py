@@ -855,8 +855,10 @@ class Neopet:
     """
 
     __slots__: tuple[str, ...] = (
+        "_closet_cache",
         "_state",
         "_valid_poses",
+        "_worn_cache",
         "appearance",
         "color",
         "items",
@@ -888,6 +890,13 @@ class Neopet:
         self.size: LayerImageSize = size or LayerImageSize.SIZE_600
         self.pose: PetPose = pose
         self._valid_poses: BitField = valid_poses
+        self._worn_cache: list[Item] | None = None
+        self._closet_cache: list[Item] | None = None
+
+    def _get_rendered_items(self) -> tuple[list[Item], list[Item]]:
+        if self._worn_cache is None:
+            self._worn_cache, self._closet_cache = _render_items(self.items)
+        return self._worn_cache, self._closet_cache  # type: ignore[return-value]
 
     @classmethod
     async def _fetch_assets_for(
@@ -1040,7 +1049,7 @@ class Neopet:
         }
 
         if self.items:
-            objects, closet = _render_items(self.items)
+            objects, closet = self._get_rendered_items()
             params["objects[]"] = [item.id for item in objects]
             params["closet[]"] = [item.id for item in closet]
         return f"https://impress.openneo.net/wardrobe#{urlencode(params, doseq=True)}"
@@ -1056,7 +1065,7 @@ class Neopet:
         }
 
         if self.items:
-            objects, closet = _render_items(self.items)
+            objects, closet = self._get_rendered_items()
             params["objects[]"] = [item.id for item in objects]
             params["closet[]"] = [item.id for item in closet]
         return (
@@ -1066,20 +1075,21 @@ class Neopet:
     @property
     def worn_items(self) -> list[Item]:
         """List[:class:`Item`]: Returns the items that are worn on the pet."""
-        worn, _ = _render_items(self.items)
+        worn, _ = self._get_rendered_items()
         return worn
 
     @property
     def closet_items(self) -> list[Item]:
         """List[:class:`Item`]: Returns the items that are in the closet but not worn on the pet."""
-        _, closet = _render_items(self.items)
+        _, closet = self._get_rendered_items()
         return closet
 
     def clear_closet(self) -> None:
         """Removes items from the closet that would not be rendered to the pet appearance."""
-        _, closet = _render_items(self.items)
+        _, closet = self._get_rendered_items()
         new_items: list[Item] = [item for item in self.items if item not in closet]
         self.items = new_items
+        self._worn_cache = self._closet_cache = None
 
     @property
     def is_glitched(self) -> bool:
@@ -1090,7 +1100,7 @@ class Neopet:
         if self.appearance.has_glitches:
             return True
 
-        items, _ = _render_items(self.items)
+        items, _ = self._get_rendered_items()
         for item in items:
             if item.appearance:
                 for layer in item.appearance.layers:
