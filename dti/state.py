@@ -309,6 +309,7 @@ class State:
         async with self._lock:
             if self._zones is None:
                 from .models import Zone
+
                 zone_data = await self.http.fetch_all_zones()
                 self._zones = [Zone(data=zone) for zone in zone_data]
             return self._zones

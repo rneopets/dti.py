@@ -32,7 +32,6 @@ if TYPE_CHECKING:
         ItemAppearancePayload,
         OutfitPayload,
         PetAppearancePayload,
-        ZonePayload,
     )
 
 
