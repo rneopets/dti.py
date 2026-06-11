@@ -133,6 +133,16 @@ class Client:
             raise InvalidColor
         return color
 
+    async def _ensure_species(self, species: int | str | Species, /) -> Species:
+        if isinstance(species, Species):
+            return species
+        return await self.get_species(species)
+
+    async def _ensure_color(self, color: int | str | Color, /) -> Color:
+        if isinstance(color, Color):
+            return color
+        return await self.get_color(color)
+
     async def get_bit(
         self,
         *,
@@ -165,11 +175,8 @@ class Client:
         :class:`BitField`: Returns the bit array field for a given pet species/color.
 
         """
-        if not isinstance(species, Species):
-            species = await self.get_species(species)
-
-        if not isinstance(color, Color):
-            color = await self.get_color(color)
+        species = await self._ensure_species(species)
+        color = await self._ensure_color(color)
 
         return await self._state._get_bit(species_id=species.id, color_id=color.id)  # type: ignore
 
@@ -205,11 +212,8 @@ class Client:
         :class:`bool`: Whether or not this species/color/pose combo exists.
 
         """
-        if not isinstance(species, Species):
-            species = await self.get_species(species)
-
-        if not isinstance(color, Color):
-            color = await self.get_color(color)
+        species = await self._ensure_species(species)
+        color = await self._ensure_color(color)
 
         return await self._state._check(  # type: ignore
             species_id=species.id,
@@ -262,11 +266,8 @@ class Client:
             The Neopet with the options applied to it.
 
         """
-        if not isinstance(species, Species):
-            species = await self.get_species(species)
-
-        if not isinstance(color, Color):
-            color = await self.get_color(color)
+        species = await self._ensure_species(species)
+        color = await self._ensure_color(color)
 
         if pose is None:
             ideal_pose = random.choice([PetPose.HAPPY_FEM, PetPose.HAPPY_MASC])
@@ -491,11 +492,8 @@ class Client:
             The corresponding pet appearance.
 
         """
-        if not isinstance(species, Species):
-            species = await self.get_species(species)
-
-        if not isinstance(color, Color):
-            color = await self.get_color(color)
+        species = await self._ensure_species(species)
+        color = await self._ensure_color(color)
 
         valid: bool = await self.check(species=species, color=color, pose=pose)
 
@@ -581,11 +579,8 @@ class Client:
             The list of this pet's appearances.
 
         """
-        if not isinstance(species, Species):
-            species = await self.get_species(species)
-
-        if not isinstance(color, Color):
-            color = await self.get_color(color)
+        species = await self._ensure_species(species)
+        color = await self._ensure_color(color)
 
         valid: bool = await self.check(species=species, color=color)
 
@@ -639,11 +634,8 @@ class Client:
             A list of the pet appearance IDs.
 
         """
-        if not isinstance(species, Species):
-            species = await self.get_species(species)
-
-        if not isinstance(color, Color):
-            color = await self.get_color(color)
+        species = await self._ensure_species(species)
+        color = await self._ensure_color(color)
 
         valid: bool = await self.check(species=species, color=color)
 
