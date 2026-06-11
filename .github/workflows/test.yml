@@ -27,6 +27,18 @@ jobs:
         run: |
           uv run --frozen pytest
 
+  all-tests-pass:
+    name: All tests pass
+    runs-on: ubuntu-latest
+    needs: [pytest]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.pytest.result }}" != "success" ]]; then
+            exit 1
+          fi
+
   pre-commit:
     runs-on: ubuntu-latest
     steps:
