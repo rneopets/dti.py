@@ -26,6 +26,25 @@ class _NameDict(dict[str | int, T]):
     # this is only to be used by DTIState
     # for the sole purpose of easily searching colors/species by name
     # that said, we're throwing away any error prevention outside of these rules
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        # secondary index: lowercased name -> value, for O(1) name lookups
+        self._name_index: dict[str, T] = {v.name.lower(): v for v in self.values()}
+
+    def __setitem__(self, key: str | int, value: T) -> None:
+        super().__setitem__(key, value)
+        self._name_index[value.name.lower()] = value
+
+    def __delitem__(self, key: str | int) -> None:
+        value = dict.__getitem__(self, key)
+        self._name_index.pop(value.name.lower(), None)
+        super().__delitem__(key)
+
+    def clear(self) -> None:
+        super().clear()
+        self._name_index.clear()
+
     def __getitem__(self, key: str | int) -> T | None:
         # lowercase to make it less annoying to search
         search_key = str(key).lower()
@@ -34,7 +53,8 @@ class _NameDict(dict[str | int, T]):
             # this is the normal __getitem__ behavior
             return dict.__getitem__(self, search_key)
 
-        return next((v for v in self.values() if search_key == v.name.lower()), None)
+        # O(1) name lookup via secondary index
+        return self._name_index.get(search_key)
 
 
 class BitField(int):
