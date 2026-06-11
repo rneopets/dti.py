@@ -58,7 +58,11 @@ class InvalidItemID(DTIException):
 class HTTPException(DTIException):
     """An exception that is thrown when an HTTP request operation fails."""
 
-    def __init__(self, response: httpx.Response | httpx.HTTPError, cause: Exception | None = None) -> None:
+    def __init__(
+        self,
+        response: httpx.Response | httpx.HTTPError,
+        cause: Exception | None = None,
+    ) -> None:
         self.response = response
         self.cause = cause
         super().__init__(str(response))
