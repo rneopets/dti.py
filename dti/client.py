@@ -32,7 +32,6 @@ if TYPE_CHECKING:
         ItemAppearancePayload,
         OutfitPayload,
         PetAppearancePayload,
-        ZonePayload,
     )
 
 
@@ -611,8 +610,8 @@ class Client:
             A list of all Zones.
 
         """
-        data: list[ZonePayload] = await self._state.http.fetch_all_zones()
-        return [Zone(data=d) for d in data]
+        await self._state._lock_and_update()  # type: ignore[attr-defined]
+        return await self._state._get_zones()  # type: ignore[attr-defined]
 
     async def fetch_appearance_ids(
         self,
