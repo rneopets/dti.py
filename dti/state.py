@@ -13,7 +13,7 @@ __all__: tuple[str, ...] = ("ValidField",)
 
 if TYPE_CHECKING:
     from .enums import PetPose
-    from .models import Color, Species
+    from .models import Color, Species, Zone
 
     T = TypeVar("T", Color, Species)
 else:
@@ -189,6 +189,7 @@ class State:
         "_species",
         "_update_lock",
         "_valid_pairs",
+        "_zones",
         "http",
     )
 
@@ -201,6 +202,7 @@ class State:
         # alternatively you can list them out by doing self._colors.values()
         self._colors: dict[str | int, Color] = _NameDict()
         self._species: dict[str | int, Species] = _NameDict()
+        self._zones: list[Zone] | None = None
         self._cached: bool = False
         self._last_update: float = 0.0
 
@@ -296,8 +298,17 @@ class State:
             self._cached = False
             self._colors.clear()
             self._species.clear()
+            self._zones = None
             await self._fetch_species_and_color()
 
             self._cached = True
             self._last_update = time.monotonic()
             return self
+
+    async def _get_zones(self) -> list[Zone]:
+        async with self._lock:
+            if self._zones is None:
+                from .models import Zone
+                zone_data = await self.http.fetch_all_zones()
+                self._zones = [Zone(data=zone) for zone in zone_data]
+            return self._zones
