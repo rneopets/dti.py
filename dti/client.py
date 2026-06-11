@@ -25,6 +25,8 @@ from .models import Color, Item, Neopet, Outfit, PetAppearance, Species, Zone
 from .state import BitField, State
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from dti.types import (
         CanonicalAppearancePayload,
         FetchAllAppearancesPayload,
@@ -60,6 +62,19 @@ class Client:
         proxy: str | None = None,
     ) -> None:
         self._state = State(cache_timeout=cache_timeout, proxy=proxy)
+
+    async def close(self) -> None:
+        """|coro|
+
+        Closes the underlying HTTP client, releasing any open connections.
+        """
+        await self._state.aclose()
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await self.close()
 
     async def invalidate(self) -> None:
         """|coro|

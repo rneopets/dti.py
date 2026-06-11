@@ -47,7 +47,7 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 class HTTPClient:
-    __slots__: tuple[str, ...] = ("_proxy", "_retries")
+    __slots__: tuple[str, ...] = ("_client", "_proxy", "_retries")
     API_BASE = "https://impress-2020.openneo.net/api"
 
     def __init__(
@@ -58,6 +58,20 @@ class HTTPClient:
     ) -> None:
         self._proxy = proxy
         self._retries = retries
+        self._client: httpx.AsyncClient = httpx.AsyncClient(
+            proxy=proxy,  # type: ignore
+            transport=httpx.AsyncHTTPTransport(retries=retries),
+            limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
+            follow_redirects=True,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate, br",
+            },
+        )
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     async def _query(
         self,
@@ -66,44 +80,28 @@ class HTTPClient:
         **kwargs: dict[str, Any],
     ) -> dict[Any, Any]:
         # for graphql queries
-        kwargs["headers"] = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate, br",
-        }
-
         payload: dict[str, Any] = {"query": query}
         if variables:
             payload["variables"] = variables
 
-        async with httpx.AsyncClient(
-            proxy=self._proxy,  # type: ignore
-            transport=httpx.AsyncHTTPTransport(retries=self._retries),
-        ) as client:
-            try:
-                response = await client.post(
-                    f"{self.API_BASE}/graphql",
-                    json=payload,
-                    **kwargs,
-                )
-                return response.json()
-            except json.decoder.JSONDecodeError as e:
-                raise HTTPException(response, e) from e
-            except httpx.HTTPError as e:
-                raise HTTPException(e) from e
+        try:
+            response = await self._client.post(
+                f"{self.API_BASE}/graphql",
+                json=payload,
+                **kwargs,
+            )
+            return response.json()
+        except json.decoder.JSONDecodeError as e:
+            raise HTTPException(response, e) from e
+        except httpx.HTTPError as e:
+            raise HTTPException(e) from e
 
     async def _fetch_valid_pet_poses(self) -> bytes:
         return await self._fetch_binary_data(f"{self.API_BASE}/validPetPoses")
 
     async def _fetch_binary_data(self, url: str) -> bytes:
-        async with httpx.AsyncClient(
-            proxy=self._proxy,  # type: ignore
-            transport=httpx.AsyncHTTPTransport(retries=self._retries),
-            limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
-            follow_redirects=True,
-        ) as client:
-            response = await client.get(url)
-            return response.read()
+        response = await self._client.get(url)
+        return response.read()
 
     async def fetch_appearance_by_id(
         self,

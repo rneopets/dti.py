@@ -288,6 +288,9 @@ class State:
                 pose=pose,
             )
 
+    async def aclose(self) -> None:
+        await self.http.aclose()
+
     async def _update(self: S, force: bool = False) -> S:
         async with self._update_lock:
             # forces cache, if outdated
