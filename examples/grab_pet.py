@@ -10,8 +10,7 @@ async def main() -> None:
     try:
         pet = await dti_client.fetch_neopet_by_name("diceroll123456789")
 
-        with open("./pet.png", "wb") as fp:
-            await pet.render(fp)
+        await pet.render("./pet.png")
     except NeopetNotFound as e:
         # raised if the pet by that name does not exist
         print(e)

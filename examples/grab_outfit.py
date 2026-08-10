@@ -10,8 +10,7 @@ async def main() -> None:
     try:
         outfit = await dti_client.fetch_outfit(1234567890)
 
-        with open("./outfit.png", "wb") as fp:
-            await outfit.render(fp)
+        await outfit.render("./outfit.png")
     except OutfitNotFound as e:
         import traceback
 
