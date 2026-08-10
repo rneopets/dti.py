@@ -188,7 +188,7 @@ class HTTPClient:
         # so let's just check the latter first
         if "data" not in data:
             # an error we were not prepared for has occurred, let's find it!
-            log.critical(f"Unknown pet appearance data returned: {str(data)}")
+            log.critical(f"Unknown pet appearance data returned: {data!s}")
             raise NeopetNotFound(
                 "An error occurred while trying to gather this pet's data.",
             )
@@ -206,7 +206,7 @@ class HTTPClient:
                         "This pet's modeling data isn't loaded into DTI yet! Go model it on Classic DTI!",
                     )
 
-            log.critical(f"Unhandled error occurred in data: {str(data)}")
+            log.critical(f"Unhandled error occurred in data: {data!s}")
             raise NeopetNotFound(
                 "An error occurred while trying to gather this pet's data.",
             )
@@ -260,14 +260,14 @@ class HTTPClient:
                     f"According to DTI, the {species} species does not have the color {color}. If it's newly released, it must be modeled first!",
                 )
 
-            log.critical(f"Unhandled error occurred in data: {str(data)}")
+            log.critical(f"Unhandled error occurred in data: {data!s}")
             raise NeopetNotFound(
                 "An error occurred while trying to gather this pet's data.",
             )
 
         if "data" not in data:
             # an error we were not prepared for has occurred, let's find it!
-            log.critical(f"Unknown pet appearance data returned: {str(data)}")
+            log.critical(f"Unknown pet appearance data returned: {data!s}")
             raise NeopetNotFound(
                 "An error occurred while trying to gather this pet's data.",
             )

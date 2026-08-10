@@ -5,6 +5,8 @@ import contextlib
 import time
 from typing import TYPE_CHECKING, TypeVar
 
+from typing_extensions import Self
+
 from .constants import ALL_SPECIES_AND_COLORS
 from .errors import InvalidPairBytes
 from .http import HTTPClient
@@ -291,7 +293,7 @@ class State:
     async def aclose(self) -> None:
         await self.http.aclose()
 
-    async def _update(self: S, force: bool = False) -> S:
+    async def _update(self, force: bool = False) -> Self:
         async with self._update_lock:
             # forces cache, if outdated
             if not force and not self.is_outdated:
