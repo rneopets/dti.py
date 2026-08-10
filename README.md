@@ -27,4 +27,4 @@ uv pip install .
 
 ## Links
 - [Dress To Impress](https://impress.openneo.net/)
-- [DTI's Github Repo](https://github.com/openneo/impress/)
+- [DTI's Repo](https://code.openneo.net/OpenNeo/impress)
