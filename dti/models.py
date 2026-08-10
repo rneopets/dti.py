@@ -1168,7 +1168,7 @@ class Neopet:
             )
             pet_appearance = PetAppearance(data=data, size=self.size, state=self._state)
 
-        await pet_appearance.render(fp, items=self.items, seek_begin=seek_begin)
+        await pet_appearance.render(fp, items=self.worn_items, seek_begin=seek_begin)
 
     @staticmethod
     async def from_outfit(
@@ -1226,7 +1226,7 @@ class Neopet:
     @property
     def image_url(self) -> str:
         """:class:`str`: Convenience property for getting a Neopet's pet appearance render url."""
-        return self.appearance.image_url(items=self.items)
+        return self.appearance.image_url(items=self.worn_items)
 
     @property
     def layers(self) -> list[AppearanceLayer]:
