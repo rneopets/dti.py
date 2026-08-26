@@ -579,7 +579,12 @@ class PetAppearance(Object):
             item_ids=item_ids,
         )
 
-    async def read(self, *, items: Sequence[Item] | None = None) -> bytes:
+    async def read(
+        self,
+        *,
+        items: Sequence[Item] | None = None,
+        style: int | None = None,
+    ) -> bytes:
         """|coro|
 
         Retrieves the content of the server-side-rendered image of this pet appearance as a :class:`bytes` object.
@@ -588,6 +593,8 @@ class PetAppearance(Object):
         ----------
         items: Optional[Sequence[:class:`Item`]]
             An optional list of items to render on this appearance.
+        style: Optional[:class:`int`]
+            The alt style ID active on this appearance, if any.
 
         Returns
         -------
@@ -595,7 +602,9 @@ class PetAppearance(Object):
             The content of the rendered image.
 
         """
-        return await self._state.http._fetch_binary_data(self.image_url(items=items))  # type: ignore
+        return await self._state.http._fetch_binary_data(  # type: ignore
+            self.image_url(items=items, style=style),
+        )
 
     async def render(
         self,
@@ -603,6 +612,7 @@ class PetAppearance(Object):
         /,
         *,
         items: Sequence[Item] | None = None,
+        style: int | None = None,
         seek_begin: bool = True,
     ) -> None:
         """|coro|
@@ -623,11 +633,13 @@ class PetAppearance(Object):
             A path string, or a file-like object opened in binary mode and write mode (`wb`).
         items: Optional[Sequence[:class:`Item`]]
             An optional list of items to render on this appearance.
+        style: Optional[:class:`int`]
+            The alt style ID active on this appearance, if any.
         seek_begin: :class:`bool`
             Whether to seek to the beginning of the file after saving is successfully done.
 
         """
-        data: bytes = await self.read(items=items)
+        data: bytes = await self.read(items=items, style=style)
 
         def write() -> None:
             if isinstance(fp, io.BufferedIOBase):
@@ -1370,9 +1382,12 @@ class Neopet:
 
         """
         pet_appearance = self.appearance
+        style = self.alt_style.id if self.alt_style else None
 
         if pose is not None and pose != self.pose:
-            # override pose here
+            # overriding the pose fetches a distinct appearance from DTI, unrelated to
+            # any alt style this Neopet may have - poses aren't a meaningful concept
+            # for alt styles, so there's nothing to carry over here.
             is_valid: bool = self.check(pose)
             if not is_valid:
                 raise MissingPetAppearance(
@@ -1386,8 +1401,14 @@ class Neopet:
                 size=self.size,
             )
             pet_appearance = PetAppearance(data=data, size=self.size, state=self._state)
+            style = None
 
-        await pet_appearance.render(fp, items=self.worn_items, seek_begin=seek_begin)
+        await pet_appearance.render(
+            fp,
+            items=self.worn_items,
+            style=style,
+            seek_begin=seek_begin,
+        )
 
     @staticmethod
     async def from_outfit(

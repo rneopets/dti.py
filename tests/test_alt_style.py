@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -108,3 +109,42 @@ async def test_fetch_neopet_alt_style(
     assert neopet.species.name == "Lupe"
     assert neopet.pose == PetPose.UNKNOWN
     assert "style=92370" in neopet.image_url
+
+
+@pytest.mark.asyncio()
+async def test_neopet_render_includes_style_param(
+    client: Client,
+    alt_style_data_species_31: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # regression test: Neopet.render() used to build its image request via
+    # PetAppearance.read()/image_url() without ever passing the active alt style,
+    # even though Neopet.image_url (the property) did it correctly - meaning the
+    # actual rendered PNG silently dropped the style while other code paths worked.
+    async def fake_fetch(
+        self: HTTPClient,
+        species_id: int,
+    ) -> list[dict[str, Any]]:
+        return alt_style_data_species_31
+
+    monkeypatch.setattr(HTTPClient, "fetch_alt_styles_for_species", fake_fetch)
+    client._state._alt_styles.pop(31, None)
+
+    neopet = await client.fetch_neopet_alt_style(
+        species_id=31,
+        alt_style_id=92370,
+        name="test_pet",
+    )
+
+    captured_urls: list[str] = []
+
+    async def fake_fetch_binary_data(self: HTTPClient, url: str) -> bytes:
+        captured_urls.append(url)
+        return b""
+
+    monkeypatch.setattr(HTTPClient, "_fetch_binary_data", fake_fetch_binary_data)
+
+    await neopet.render(io.BytesIO())
+
+    assert captured_urls
+    assert "style=92370" in captured_urls[0]
