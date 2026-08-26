@@ -15,7 +15,7 @@ __all__: tuple[str, ...] = ("ValidField",)
 
 if TYPE_CHECKING:
     from .enums import PetPose
-    from .models import Color, Species, Zone
+    from .models import AltStyle, Color, Species, Zone
 
     T = TypeVar("T", Color, Species)
 else:
@@ -183,6 +183,7 @@ class ValidField:
 
 class State:
     __slots__: tuple[str, ...] = (
+        "_alt_styles",
         "_cache_timeout",
         "_cached",
         "_colors",
@@ -205,6 +206,9 @@ class State:
         self._colors: dict[str | int, Color] = _NameDict()
         self._species: dict[str | int, Species] = _NameDict()
         self._zones: list[Zone] | None = None
+        # alt styles are cached lazily, per species, since they're not part of the
+        # species/color/valid-pairs refresh cycle (they live on a separate REST endpoint)
+        self._alt_styles: dict[int, dict[int, AltStyle]] = {}
         self._cached: bool = False
         self._last_update: float = 0.0
 
@@ -318,3 +322,29 @@ class State:
                 zone_data = await self.http.fetch_all_zones()
                 self._zones = [Zone(data=zone) for zone in zone_data]
             return self._zones
+
+    async def get_alt_style(
+        self,
+        *,
+        species_id: int,
+        alt_style_id: int,
+    ) -> AltStyle | None:
+        """|coro|
+
+        Returns the :class:`AltStyle` for the given species + alt style ID combo, fetching
+        and caching that species' alt style catalog from impress.openneo.net if it isn't
+        cached yet. Returns None if no such alt style exists for that species.
+        """
+        # ensure species/color names are cached, since AltStyle needs them to build its appearance
+        await self._lock_and_update()
+
+        async with self._lock:
+            if species_id not in self._alt_styles:
+                from .models import AltStyle
+
+                data = await self.http.fetch_alt_styles_for_species(species_id)
+                self._alt_styles[species_id] = {
+                    int(entry["id"]): AltStyle(state=self, data=entry) for entry in data
+                }
+
+            return self._alt_styles[species_id].get(int(alt_style_id))

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 92370,
+    "species_id": 31,
+    "color_id": 44,
+    "body_id": 1170,
+    "thumbnail_url": "https://images.neopets.com/items/035666cd.gif",
+    "series_main_name": "Aquatic",
+    "adjective_name": "Aquatic Maraquan",
+    "swf_assets": [
+      {
+        "id": 722952,
+        "body_id": 1170,
+        "urls": {
+          "swf": "https://images.neopets.com/cp/bio/swf/000/000/060/60189_e90d65ce95.swf",
+          "png": "https://images.neopets.com/cp/bio/data/000/000/060/60189_e90d65ce95/60189.png?v=05d8742b2f",
+          "svg": "https://images.neopets.com/cp/bio/data/000/000/060/60189_e90d65ce95/60189.svg?v=05d8742b2f",
+          "canvas_library": null,
+          "manifest": "https://images.neopets.com/cp/bio/data/000/000/060/60189_e90d65ce95/manifest.json"
+        },
+        "known_glitches": [],
+        "zone": {
+          "id": 15,
+          "depth": 18,
+          "type_id": 1,
+          "label": "Body",
+          "plain_label": "body"
+        }
+      }
+    ]
+  }
+]

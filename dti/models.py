@@ -18,6 +18,7 @@ from .enums import (
 )
 from .errors import (
     GlitchedNeopet,
+    InvalidAltStyle,
     InvalidColorSpeciesPair,
     MissingPetAppearance,
     NullAssetImage,
@@ -33,6 +34,8 @@ if TYPE_CHECKING:
     from .state import BitField, State
     from .types import (
         ID,
+        AltStylePayload,
+        AltStyleSwfAssetPayload,
         AppearanceLayerPayload,
         ColorPayload,
         ItemAppearancePayload,
@@ -44,6 +47,7 @@ if TYPE_CHECKING:
     )
 
 __all__: tuple[str, ...] = (
+    "AltStyle",
     "AppearanceLayer",
     "Color",
     "Item",
@@ -544,12 +548,19 @@ class PetAppearance(Object):
 
         return [layer_sorter[layer] for layer in sorted(layer_sorter)]
 
-    def image_url(self, *, items: Sequence[Item] | None = None) -> str:
+    def image_url(
+        self,
+        *,
+        items: Sequence[Item] | None = None,
+        style: int | None = None,
+    ) -> str:
         """
         Parameters
         -----------
         items: Optional[Sequence[:class:`Item`]]
             An optional list of items to render on this appearance.
+        style: Optional[:class:`int`]
+            The alt style ID active on this appearance, if any.
 
         Returns
         -------
@@ -564,6 +575,7 @@ class PetAppearance(Object):
             species=self.species.id,
             color=self.color.id,
             pose=self.pose,
+            style=style,
             item_ids=item_ids,
         )
 
@@ -627,6 +639,138 @@ class PetAppearance(Object):
                     f.write(data)
 
         await asyncio.get_running_loop().run_in_executor(None, write)
+
+
+def _alt_style_layer_payload(asset: AltStyleSwfAssetPayload) -> AppearanceLayerPayload:
+    # adapts a swf_asset entry from impress.openneo.net's alt-style catalog (REST) into
+    # the GraphQL-shaped AppearanceLayerPayload that AppearanceLayer.__init__ expects.
+    asset_id = str(asset["id"])
+    zone = asset["zone"]
+    return {
+        "id": asset_id,
+        # there's no separate "remote id" concept in this REST payload
+        "remoteId": asset_id,
+        "imageUrlV2": asset["urls"].get("png"),
+        "bodyId": str(asset["body_id"]),
+        "knownGlitches": asset.get("known_glitches") or [],
+        "zone": {
+            "id": str(zone["id"]),
+            "depth": zone["depth"],
+            "label": zone["label"],
+        },
+    }
+
+
+def _alt_style_appearance_payload(
+    *,
+    state: State,
+    data: AltStylePayload,
+) -> PetAppearancePayload:
+    # builds a synthetic PetAppearancePayload from the alt-style catalog's data, so
+    # AltStyle can reuse the existing PetAppearance constructor instead of forking
+    # appearance-building into a second code path.
+    species_id = str(data["species_id"])
+    color_id = str(data["color_id"])
+
+    # look up real names from the (already-populated) species/color cache; fall back to
+    # the raw id if somehow missing, same spirit as PetAppearance's "temporary" Color/Species
+    species = state._species[species_id]  # type: ignore
+    color = state._colors[color_id]  # type: ignore
+
+    return {
+        "id": f"alt-style-{data['id']}",
+        "petStateId": str(data["id"]),
+        "bodyId": str(data["body_id"]),
+        "isGlitched": False,
+        "color": {"id": color_id, "name": color.name if color else color_id},
+        "species": {"id": species_id, "name": species.name if species else species_id},
+        "pose": "UNKNOWN",
+        "layers": [_alt_style_layer_payload(asset) for asset in data["swf_assets"]],
+        "restrictedZones": [],
+    }
+
+
+class AltStyle(Object):
+    """Represents a Neopet's alt style, sometimes called an "NC Style" or "token".
+
+    An alt style is a purchasable cosmetic appearance that completely replaces a pet's
+    normal species+color layers with its own distinct body/art set, rather than adding
+    to them. Unlike a normal :class:`PetAppearance`, alt style data doesn't come from
+    DTI's GraphQL API - it's fetched from a separate catalog on impress.openneo.net.
+
+    .. container:: operations
+
+        .. describe:: x == y
+
+            Checks if two alt styles are equal.
+
+        .. describe:: x != y
+
+            Checks if two alt styles are not equal.
+
+        .. describe:: hash(x)
+
+            Returns the alt style's hash.
+
+    Attributes
+    ----------
+    id: :class:`int`
+        The alt style's ID.
+    species_id: :class:`int`
+        The ID of the species this alt style applies to.
+    color_id: :class:`int`
+        The ID of the color this alt style is associated with.
+    body_id: :class:`int`
+        The alt style's body ID. Distinct from any regular pet body ID, and only
+        `body_id = 0` items are compatible with it.
+    thumbnail_url: :class:`str`
+        A thumbnail image url for this alt style.
+    series_main_name: :class:`str`
+        The name of the series this alt style belongs to, e.g. "Aquatic".
+    adjective_name: :class:`str`
+        The full descriptive name of this alt style, e.g. "Aquatic Maraquan".
+    appearance: :class:`PetAppearance`
+        A synthetic pet appearance built from this alt style's layers, suitable for
+        rendering just like a normal :class:`PetAppearance`. Its pose is always
+        :attr:`PetPose.UNKNOWN`, since pose isn't a meaningful concept for alt styles.
+
+    """
+
+    __slots__: tuple[str, ...] = (
+        "_state",
+        "adjective_name",
+        "appearance",
+        "body_id",
+        "color_id",
+        "id",
+        "series_main_name",
+        "species_id",
+        "thumbnail_url",
+    )
+
+    def __init__(self, *, state: State, data: AltStylePayload) -> None:
+        self._state = state
+        self.id: int = int(data["id"])
+        self.species_id: int = int(data["species_id"])
+        self.color_id: int = int(data["color_id"])
+        self.body_id: int = int(data["body_id"])
+        self.thumbnail_url: str = utils.url_sanitizer(data["thumbnail_url"])
+        self.series_main_name: str = data["series_main_name"]
+        self.adjective_name: str = data["adjective_name"]
+
+        self.appearance: PetAppearance = PetAppearance(
+            state=state,
+            size=LayerImageSize.SIZE_600,
+            data=_alt_style_appearance_payload(state=state, data=data),
+        )
+
+    @property
+    def layers(self) -> list[AppearanceLayer]:
+        """List[:class:`AppearanceLayer`]: The appearance layers that make up this alt style."""
+        return self.appearance.layers
+
+    def __repr__(self) -> str:
+        return f"<AltStyle id={self.id} adjective_name={self.adjective_name!r}>"
 
 
 class ItemAppearance(Object):
@@ -851,6 +995,9 @@ class Neopet:
         A list of the items that will be applied to the pet. Can be empty.
     name: Optional[:class:`str`]
         The name of the Neopet, if one is supplied.
+    alt_style: Optional[:class:`AltStyle`]
+        The alt style ("NC Style"/"token") active on this pet, if any. `None` for a
+        normal pet.
 
     """
 
@@ -859,6 +1006,7 @@ class Neopet:
         "_state",
         "_valid_poses",
         "_worn_cache",
+        "alt_style",
         "appearance",
         "color",
         "items",
@@ -879,6 +1027,7 @@ class Neopet:
         items: Sequence[Item] | None = None,
         size: LayerImageSize | None = None,
         name: str | None = None,
+        alt_style: AltStyle | None = None,
         state: State,
     ) -> None:
         self._state: State = state
@@ -889,6 +1038,7 @@ class Neopet:
         self.name: str | None = name
         self.size: LayerImageSize = size or LayerImageSize.SIZE_600
         self.pose: PetPose = pose
+        self.alt_style: AltStyle | None = alt_style
         self._valid_poses: BitField = valid_poses
         self._worn_cache: list[Item] | None = None
         self._closet_cache: list[Item] | None = None
@@ -1038,6 +1188,72 @@ class Neopet:
         )
         return neopet
 
+    @classmethod
+    async def _fetch_alt_style_for(
+        cls,
+        *,
+        state: State,
+        species_id: int,
+        alt_style_id: int,
+        item_ids: Sequence[ID] | None = None,
+        item_names: Sequence[str] | None = None,
+        size: LayerImageSize | None = None,
+        name: str | None = None,
+    ) -> Neopet:
+        """Returns the data for a species + alt style ID combo, optionally with items and a name.
+
+        Unlike :meth:`_fetch_by_name`/:meth:`_fetch_assets_for`, this never touches DTI's
+        `petAppearance` GraphQL field - alt styles don't have a queryable appearance of
+        their own there, so the appearance is built entirely from the alt style catalog
+        (see :meth:`State.get_alt_style`).
+        """
+
+        alt_style = await state.get_alt_style(  # type: ignore
+            species_id=species_id,
+            alt_style_id=alt_style_id,
+        )
+
+        if alt_style is None:
+            raise InvalidAltStyle(
+                f"Alt style ID {alt_style_id} does not exist for species ID {species_id}.",
+            )
+
+        size = size or LayerImageSize.SIZE_600
+        species: Species = alt_style.appearance.species
+        color: Color = alt_style.appearance.color
+
+        items: list[Item] = []
+        if item_ids or item_names:
+            item_data = await state.http.fetch_items_for_alt_style(  # type: ignore
+                species_id=species_id,
+                color_id=alt_style.color_id,
+                alt_style_id=alt_style.id,
+                item_ids=item_ids,
+                item_names=item_names,
+                size=size,
+            )
+            items = [
+                Item(data=item, state=state) for item in item_data if item is not None
+            ]
+
+        bit: BitField = await state._get_bit(  # type: ignore
+            species_id=species_id,
+            color_id=alt_style.color_id,
+        )
+
+        return Neopet(
+            species=species,
+            color=color,
+            pose=alt_style.appearance.pose,
+            valid_poses=bit,
+            items=items,
+            appearance=alt_style.appearance,
+            alt_style=alt_style,
+            name=name,
+            size=size,
+            state=state,
+        )
+
     @property
     def legacy_closet_url(self) -> str:
         """:class:`str`: Returns the legacy closet URL for a Neopet customization."""
@@ -1063,6 +1279,9 @@ class Neopet:
             "color": self.color.id,
             "pose": str(self.pose),
         }
+
+        if self.alt_style:
+            params["style"] = self.alt_style.id
 
         if self.items:
             objects, closet = self._get_rendered_items()
@@ -1226,7 +1445,8 @@ class Neopet:
     @property
     def image_url(self) -> str:
         """:class:`str`: Convenience property for getting a Neopet's pet appearance render url."""
-        return self.appearance.image_url(items=self.worn_items)
+        style = self.alt_style.id if self.alt_style else None
+        return self.appearance.image_url(items=self.worn_items, style=style)
 
     @property
     def layers(self) -> list[AppearanceLayer]:

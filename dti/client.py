@@ -346,6 +346,67 @@ class Client:
             state=self._state,
         )
 
+    async def fetch_neopet_alt_style(
+        self,
+        *,
+        species_id: int,
+        alt_style_id: int,
+        item_names: list[str] | None = None,
+        item_ids: list[int] | None = None,
+        name: str | None = None,
+        size: LayerImageSize = LayerImageSize.SIZE_600,
+    ) -> Neopet:
+        """|coro|
+
+        Creates a :class:`Neopet` from an alt style ("NC Style"/"token") directly, given
+        a species ID and an alt style ID.
+
+        Unlike :meth:`fetch_neopet_by_name`, this does not - and cannot - detect whether
+        a live, named pet currently has an alt style active. DTI's GraphQL API has no way
+        to know that, since alt style catalog data lives on a separate
+        impress.openneo.net endpoint rather than DTI's own database. Detecting that a
+        named pet has an active alt style (and which one) is the caller's
+        responsibility; this method is for building the resulting appearance once you
+        already know the species ID and alt style ID.
+
+        Parameters
+        ----------
+        species_id: :class:`int`
+            The species ID this alt style applies to.
+        alt_style_id: :class:`int`
+            The alt style ID.
+        item_names: Optional[List[:class:`str`]]
+            A list of item names to search for + add to the items of the Neopet. Only
+            `body_id = 0` items are actually compatible with alt styles.
+        item_ids: Optional[List[:class:`int`]]
+            A list of item IDs to search for + add to the items of the Neopet. Only
+            `body_id = 0` items are actually compatible with alt styles.
+        name: Optional[:class:`str`]
+            The name of the Neopet, if one is supplied. Not verified against Neopets.com.
+        size: :class:`LayerImageSize`
+            The desired size for the render. Defaults to `LayerImageSize.SIZE_600`.
+
+        Raises
+        ------
+        ~dti.InvalidAltStyle
+            The alt style ID does not exist for the given species.
+
+        Returns
+        -------
+        :class:`Neopet`
+            The Neopet with the alt style applied.
+
+        """
+        return await Neopet._fetch_alt_style_for(  # type: ignore
+            state=self._state,
+            species_id=species_id,
+            alt_style_id=alt_style_id,
+            item_ids=item_ids,
+            item_names=item_names,
+            size=size,
+            name=name,
+        )
+
     async def fetch_outfit(
         self,
         outfit_id: int,
@@ -392,6 +453,7 @@ class Client:
         item_kind: ItemKind | None = None,
         species_id: int | None = None,
         color_id: int | None = None,
+        alt_style_id: int | None = None,
         item_ids: list[int] | None = None,
         per_page: int | None = None,
         size: LayerImageSize = LayerImageSize.SIZE_600,
@@ -408,6 +470,11 @@ class Client:
             The ID of the species you're trying to find items for. Only used when `query` is supplied. If so, this is mandatory.
         color_id: Optional[:class:`int`]
             The ID of the color you're trying to find items for. Only used when `query` is supplied. If so, this is mandatory.
+        alt_style_id: Optional[:class:`int`]
+            The ID of an active alt style, if searching for items that fit a pet wearing
+            one. Only used when `query` is supplied alongside `species_id`/`color_id`.
+            Since alt styles completely replace a pet's normal layers, only
+            `body_id = 0` items will actually be compatible.
         item_kind: Optional[:class:`ItemKind`]
             The desired kind of item you're trying to find. Can significantly reduce your search query.
         per_page: Optional[:class:`int`]
@@ -447,6 +514,7 @@ class Client:
                 query=query,
                 species_id=species_id,
                 color_id=color_id,
+                alt_style_id=alt_style_id,
                 size=size,
                 item_kind=item_kind,
                 per_page=per_page,

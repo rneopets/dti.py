@@ -55,6 +55,43 @@ class ItemAppearancePayload(_BaseObject):
     restrictedZones: list[ZonePayload]
 
 
+# these describe the REST payload from impress.openneo.net's alt-style catalog
+# (GET /species/{species_id}/alt-styles.json), NOT the GraphQL API.
+class AltStyleSwfAssetUrlsPayload(TypedDict):
+    swf: str
+    png: str | None
+    svg: str | None
+    canvas_library: str | None
+    manifest: str | None
+
+
+class AltStyleZonePayload(TypedDict):
+    id: int
+    depth: int
+    type_id: int
+    label: str
+    plain_label: str
+
+
+class AltStyleSwfAssetPayload(TypedDict):
+    id: int
+    body_id: int
+    urls: AltStyleSwfAssetUrlsPayload
+    known_glitches: list[str]
+    zone: AltStyleZonePayload
+
+
+class AltStylePayload(TypedDict):
+    id: int
+    species_id: int
+    color_id: int
+    body_id: int
+    thumbnail_url: str
+    series_main_name: str
+    adjective_name: str
+    swf_assets: list[AltStyleSwfAssetPayload]
+
+
 class BaseItemPayload(_BaseObject):
     name: str
     description: str
