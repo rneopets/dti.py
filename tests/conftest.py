@@ -71,3 +71,10 @@ def assets_data_covers_biology() -> dict[str, Any]:
     return json.loads(
         (payloads / "neopet__fetch_assets_for__covers_biology.json").read_text(),
     )
+
+
+@pytest.fixture()
+def alt_style_data_species_31() -> list[dict[str, Any]]:
+    # alt-style catalog payload from GET impress.openneo.net/species/31/alt-styles.json
+    # (trimmed to just the "Aquatic Maraquan" style, id 92370 - a real style seen live)
+    return json.loads((payloads / "alt_style__species_31.json").read_text())

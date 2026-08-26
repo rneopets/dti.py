@@ -112,6 +112,7 @@ class ItemSearchToFit(PaginatedDTISearch):
         query: str,
         species_id: int,
         color_id: int,
+        alt_style_id: int | None = None,
         per_page: int = 30,
         item_kind: ItemKind | None = None,
         size: LayerImageSize = LayerImageSize.SIZE_600,
@@ -121,19 +122,28 @@ class ItemSearchToFit(PaginatedDTISearch):
         self.query = query
         self.species_id = species_id
         self.color_id = color_id
+        self.alt_style_id = alt_style_id
         self.item_kind = item_kind
         self.offset = 0
         self.per_page = per_page
         self.size: LayerImageSize = size
 
     async def fetch_items(self) -> list[ItemPayload]:
+        fits_pet: dict[str, Any] = {
+            "speciesId": self.species_id,
+            "colorId": self.color_id,
+        }
+        if self.alt_style_id is not None:
+            fits_pet["altStyleId"] = self.alt_style_id
+
         data = await self._state.http._query(  # type: ignore
             query=SEARCH_TO_FIT,
             variables={
                 "query": self.query,
                 "speciesId": self.species_id,
                 "colorId": self.color_id,
-                "fitsPet": {"speciesId": self.species_id, "colorId": self.color_id},
+                "altStyleId": self.alt_style_id,
+                "fitsPet": fits_pet,
                 "itemKind": str(self.item_kind) if self.item_kind else None,
                 "offset": self.offset,
                 "limit": self.per_page,

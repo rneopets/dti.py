@@ -105,11 +105,11 @@ query($itemIds: [ID!]!) {
 
 SEARCH_TO_FIT = (
     """
-query($query: String!, $fitsPet: FitsPetSearchFilter!, $speciesId: ID!, $colorId: ID!, $itemKind: ItemKindSearchFilter, $offset: Int, $limit: Int, $size: LayerImageSize!) {
+query($query: String!, $fitsPet: FitsPetSearchFilter!, $speciesId: ID!, $colorId: ID!, $altStyleId: ID, $itemKind: ItemKindSearchFilter, $offset: Int, $limit: Int, $size: LayerImageSize!) {
   itemSearch(query: $query, fitsPet: $fitsPet, itemKind: $itemKind, offset: $offset, limit: $limit) {
     items {
       ...ItemProperties
-      appearanceOn(speciesId: $speciesId, colorId: $colorId) {
+      appearanceOn(speciesId: $speciesId, colorId: $colorId, altStyleId: $altStyleId) {
         ...ItemAppearanceForOutfitPreview
       }
     }
@@ -176,6 +176,37 @@ query ($names: [String!]!, $speciesId: ID!, $colorId: ID!, $size: LayerImageSize
     + FRAGMENT_ITEM_APPEARANCE
     + FRAGMENT_ITEM_PROPERTIES
     + FRAGMENT_PET_APPEARANCE
+)
+
+# grab item appearances fitted to an alt style (alt styles don't have a queryable
+# petAppearance of their own on DTI's GraphQL API - their appearance is built locally
+# from the impress.openneo.net alt-style catalog instead - so these only fetch items).
+GRAB_ITEMS_FOR_ALT_STYLE_BY_IDS = (
+    """
+query ($allItemIds: [ID!]!, $speciesId: ID!, $colorId: ID!, $altStyleId: ID, $size: LayerImageSize!) {
+  items(ids: $allItemIds) {
+    ...ItemProperties
+    appearanceOn(speciesId: $speciesId, colorId: $colorId, altStyleId: $altStyleId) {
+      ...ItemAppearanceForOutfitPreview
+    }
+  }
+}"""
+    + FRAGMENT_ITEM_APPEARANCE
+    + FRAGMENT_ITEM_PROPERTIES
+)
+
+GRAB_ITEMS_FOR_ALT_STYLE_BY_NAMES = (
+    """
+query ($names: [String!]!, $speciesId: ID!, $colorId: ID!, $altStyleId: ID, $size: LayerImageSize!) {
+  items: itemsByName(names: $names) {
+    ...ItemProperties
+    appearanceOn(speciesId: $speciesId, colorId: $colorId, altStyleId: $altStyleId) {
+      ...ItemAppearanceForOutfitPreview
+    }
+  }
+}"""
+    + FRAGMENT_ITEM_APPEARANCE
+    + FRAGMENT_ITEM_PROPERTIES
 )
 
 # grab pet appearance by species + color + pose

@@ -8,6 +8,8 @@ import httpx
 
 from .constants import (
     GRAB_ALL_APPEARANCES_FOR_COLOR,
+    GRAB_ITEMS_FOR_ALT_STYLE_BY_IDS,
+    GRAB_ITEMS_FOR_ALT_STYLE_BY_NAMES,
     GRAB_PET_APPEARANCE_BY_ID,
     GRAB_PET_APPEARANCE_BY_SPECIES_COLOR_POSE,
     GRAB_PET_APPEARANCE_IDS,
@@ -35,9 +37,11 @@ if TYPE_CHECKING:
     from .models import Color, Species
     from .types import (
         ID,
+        AltStylePayload,
         FetchAllAppearancesPayload,
         FetchAssetsPayload,
         FetchedNeopetPayload,
+        ItemPayload,
         OutfitPayload,
         PetAppearancePayload,
         ZonePayload,
@@ -49,6 +53,9 @@ log: logging.Logger = logging.getLogger(__name__)
 class HTTPClient:
     __slots__: tuple[str, ...] = ("_client", "_proxy", "_retries")
     API_BASE = "https://impress-2020.openneo.net/api"
+    # alt style catalog data isn't served by DTI's GraphQL API - it's a plain REST
+    # endpoint on the classic impress.openneo.net Rails app.
+    ALT_STYLES_BASE = "https://impress.openneo.net"
 
     def __init__(
         self,
@@ -304,3 +311,56 @@ class HTTPClient:
         )
 
         return data["data"]
+
+    async def fetch_alt_styles_for_species(
+        self,
+        species_id: int,
+    ) -> list[AltStylePayload]:
+        # this is a plain REST/JSON endpoint, not part of DTI's GraphQL API.
+        try:
+            response = await self._client.get(
+                f"{self.ALT_STYLES_BASE}/species/{species_id}/alt-styles.json",
+            )
+            return response.json()
+        except json.decoder.JSONDecodeError as e:
+            raise HTTPException(response, e) from e
+        except httpx.HTTPError as e:
+            raise HTTPException(e) from e
+
+    async def fetch_items_for_alt_style(
+        self,
+        *,
+        species_id: int,
+        color_id: int,
+        alt_style_id: int,
+        item_ids: Sequence[ID] | None = None,
+        item_names: Sequence[str] | None = None,
+        size: LayerImageSize = LayerImageSize.SIZE_600,
+    ) -> list[ItemPayload]:
+        # fits a list of items to an alt style. Alt styles don't have a queryable
+        # petAppearance of their own on DTI's GraphQL API, so unlike fetch_assets_for,
+        # this only ever returns items - the appearance is built locally from the
+        # impress.openneo.net alt-style catalog instead (see State.get_alt_style).
+        variables: dict[str, Any] = {
+            "speciesId": species_id,
+            "colorId": color_id,
+            "altStyleId": alt_style_id,
+            "size": str(size),
+        }
+
+        if item_names:
+            variables["names"] = item_names or []
+            query = GRAB_ITEMS_FOR_ALT_STYLE_BY_NAMES
+        else:
+            variables["allItemIds"] = item_ids or []
+            query = GRAB_ITEMS_FOR_ALT_STYLE_BY_IDS
+
+        data = await self._query(query=query, variables=variables)
+
+        if "data" not in data:
+            log.critical(f"Unknown item data returned: {data!s}")
+            raise NeopetNotFound(
+                "An error occurred while trying to gather this pet's data.",
+            )
+
+        return data["data"]["items"]

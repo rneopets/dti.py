@@ -39,6 +39,10 @@ class InvalidColorSpeciesPair(DTIException):
     """An exception that is thrown when trying to create an invalid Color/Species pair"""
 
 
+class InvalidAltStyle(DTIException):
+    """An exception that is thrown when an alt style ID does not exist for the given species."""
+
+
 class InvalidPairBytes(DTIException):
     """An exception that is thrown when the valid pet poses table data does not match. This means DTI has changed how the bit table is set up."""
 
