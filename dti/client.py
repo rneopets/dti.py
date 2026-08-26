@@ -21,7 +21,7 @@ from .iterators import (
     ItemSearchNames,
     ItemSearchToFit,
 )
-from .models import Color, Item, Neopet, Outfit, PetAppearance, Species, Zone
+from .models import AltStyle, Color, Item, Neopet, Outfit, PetAppearance, Species, Zone
 from .state import BitField, State
 
 if TYPE_CHECKING:
@@ -405,6 +405,36 @@ class Client:
             item_names=item_names,
             size=size,
             name=name,
+        )
+
+    async def fetch_alt_styles(
+        self,
+        species: int | str | Species,
+        /,
+    ) -> list[AltStyle]:
+        """|coro|
+
+        Fetches every alt style ("NC Style"/token) available for a species.
+
+        Parameters
+        ----------
+        species: Union[:class:`int`, :class:`str`, :class:`Species`]
+            The name, or ID, or Species object of the desired Species. Case-insensitive.
+
+        Raises
+        ------
+        ~dti.InvalidSpecies
+            The species does not exist.
+
+        Returns
+        -------
+        List[:class:`AltStyle`]
+            All alt styles for this species. Can be empty.
+
+        """
+        species = await self._ensure_species(species)
+        return await self._state.get_alt_styles_for_species(  # type: ignore
+            species_id=species.id,
         )
 
     async def fetch_outfit(
