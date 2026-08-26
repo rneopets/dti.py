@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlencode, urljoin, urlparse
 
-from dti.enums import LayerImageSize, PetPose
+from dti.enums import LayerImageSize
+
+if TYPE_CHECKING:
+    from .enums import PetPose
 
 __all__: tuple[str, ...] = (
     "build_layers_url",
@@ -78,14 +81,6 @@ def outfit_image_url(
 
     if style:
         parts["style"] = style
-
-        if pose == PetPose.UNKNOWN:
-            # the classic renderer rejects pose=UNKNOWN with an HTTP 400, but a
-            # styled pet's body is fully determined by the style regardless of
-            # pose - any real pose value renders identically, so just pick one.
-            # UNKNOWN is what alt style appearances use, since pose isn't a
-            # meaningful concept for them.
-            parts["pose"] = PetPose.HAPPY_MASC.name
 
     item_ids = item_ids or []
     if item_ids:
