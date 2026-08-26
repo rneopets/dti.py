@@ -323,6 +323,18 @@ class State:
                 self._zones = [Zone(data=zone) for zone in zone_data]
             return self._zones
 
+    async def _ensure_alt_styles_cached(self, species_id: int) -> dict[int, AltStyle]:
+        async with self._lock:
+            if species_id not in self._alt_styles:
+                from .models import AltStyle
+
+                data = await self.http.fetch_alt_styles_for_species(species_id)
+                self._alt_styles[species_id] = {
+                    int(entry["id"]): AltStyle(state=self, data=entry) for entry in data
+                }
+
+            return self._alt_styles[species_id]
+
     async def get_alt_style(
         self,
         *,
@@ -337,14 +349,16 @@ class State:
         """
         # ensure species/color names are cached, since AltStyle needs them to build its appearance
         await self._lock_and_update()
+        styles = await self._ensure_alt_styles_cached(species_id)
+        return styles.get(int(alt_style_id))
 
-        async with self._lock:
-            if species_id not in self._alt_styles:
-                from .models import AltStyle
+    async def get_alt_styles_for_species(self, *, species_id: int) -> list[AltStyle]:
+        """|coro|
 
-                data = await self.http.fetch_alt_styles_for_species(species_id)
-                self._alt_styles[species_id] = {
-                    int(entry["id"]): AltStyle(state=self, data=entry) for entry in data
-                }
-
-            return self._alt_styles[species_id].get(int(alt_style_id))
+        Returns every :class:`AltStyle` available for the given species, fetching and
+        caching that species' alt style catalog from impress.openneo.net if it isn't
+        cached yet. Returns an empty list if the species has no alt styles.
+        """
+        await self._lock_and_update()
+        styles = await self._ensure_alt_styles_cached(species_id)
+        return list(styles.values())

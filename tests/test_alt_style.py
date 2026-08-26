@@ -84,6 +84,36 @@ async def test_state_get_alt_style_caches(
 
 
 @pytest.mark.asyncio()
+async def test_fetch_alt_styles_for_species(
+    client: Client,
+    alt_style_data_species_31: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def fake_fetch(
+        self: HTTPClient,
+        species_id: int,
+    ) -> list[dict[str, Any]]:
+        nonlocal calls
+        calls += 1
+        return alt_style_data_species_31
+
+    monkeypatch.setattr(HTTPClient, "fetch_alt_styles_for_species", fake_fetch)
+    client._state._alt_styles.pop(31, None)
+
+    styles = await client.fetch_alt_styles(31)
+    assert [s.id for s in styles] == [92370]
+    assert styles[0].adjective_name == "Aquatic Maraquan"
+
+    # a second call, and the lower-level state method, should both reuse the
+    # cache populated above rather than re-fetching
+    styles_again = await client._state.get_alt_styles_for_species(species_id=31)
+    assert [s.id for s in styles_again] == [92370]
+    assert calls == 1
+
+
+@pytest.mark.asyncio()
 async def test_fetch_neopet_alt_style(
     client: Client,
     alt_style_data_species_31: list[dict[str, Any]],
