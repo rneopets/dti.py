@@ -62,6 +62,7 @@ class HTTPClient:
         *,
         proxy: str | dict[str, str] | None = None,
         retries: int = 3,
+        timeout: float = 15.0,
     ) -> None:
         self._proxy = proxy
         self._retries = retries
@@ -70,6 +71,11 @@ class HTTPClient:
             transport=httpx.AsyncHTTPTransport(retries=retries),
             limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
             follow_redirects=True,
+            # httpx defaults to a 5s timeout for every operation (connect/read/write/
+            # pool), which is tight for callers chaining several sequential requests
+            # (e.g. detecting + fetching + re-fetching an alt style) - a slow-but-fine
+            # response on any one of them would otherwise raise ReadTimeout outright.
+            timeout=httpx.Timeout(timeout),
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
