@@ -1225,9 +1225,14 @@ class Neopet:
         way :meth:`_fetch_by_name` does - the alt style catalog itself has no concept of
         a specific pet, only the style's own internal `color_id` (used below for the
         item-fitting/bit lookups, which is unrelated to any specific pet's real color).
-        If `name` is omitted, or the pet's real color can't be looked up (it isn't
-        modeled on DTI outside of its alt style), `color` falls back to the alt style's
-        own color, which may not match any specific pet.
+
+        This lookup needs DTI to already have the pet's real (unstyled) appearance
+        modeled, same as :meth:`_fetch_by_name` does for any pet. That's often not the
+        case for a pet whose alt style is always active: nobody ever sees (or needs to
+        submit) its real look, so it's never modeled, regardless of how common the
+        pet's actual color/species otherwise is. If `name` is omitted, or the lookup
+        fails for this or any other reason, `color` falls back to the alt style's own
+        color, which may not match any specific pet.
         """
 
         alt_style = await state.get_alt_style(  # type: ignore
@@ -1264,9 +1269,10 @@ class Neopet:
                 )
                 color = real_appearance.color
             except (MissingModelData, GlitchedNeopet, NeopetNotFound):
-                # the pet's real color isn't available (not modeled on DTI outside
-                # of its alt style, glitched, or not found) - fall back to the alt
-                # style's own color rather than failing the whole alt style fetch
+                # the pet's real appearance isn't modeled on DTI - common for a
+                # permanently-styled pet, since nobody ever sees (or submits) its
+                # real look. Fall back to the alt style's own color rather than
+                # failing the whole fetch.
                 pass
 
         items: list[Item] = []
