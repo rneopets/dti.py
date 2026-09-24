@@ -1226,13 +1226,11 @@ class Neopet:
         a specific pet, only the style's own internal `color_id` (used below for the
         item-fitting/bit lookups, which is unrelated to any specific pet's real color).
 
-        This lookup needs DTI to already have the pet's real (unstyled) appearance
-        modeled, same as :meth:`_fetch_by_name` does for any pet. That's often not the
-        case for a pet whose alt style is always active: nobody ever sees (or needs to
-        submit) its real look, so it's never modeled, regardless of how common the
-        pet's actual color/species otherwise is. If `name` is omitted, or the lookup
-        fails for this or any other reason, `color` falls back to the alt style's own
-        color, which may not match any specific pet.
+        `petOnNeopetsDotCom` isn't designed to resolve a pet while its alt style is
+        active, by design - the pet's real appearance may well already be modeled on
+        DTI (styles don't erase that data), but this lookup will still fail for it.
+        If `name` is omitted, or this lookup fails, `color` falls back to the alt
+        style's own color, which may not match any specific pet.
         """
 
         alt_style = await state.get_alt_style(  # type: ignore
@@ -1269,10 +1267,10 @@ class Neopet:
                 )
                 color = real_appearance.color
             except (MissingModelData, GlitchedNeopet, NeopetNotFound):
-                # the pet's real appearance isn't modeled on DTI - common for a
-                # permanently-styled pet, since nobody ever sees (or submits) its
-                # real look. Fall back to the alt style's own color rather than
-                # failing the whole fetch.
+                # petOnNeopetsDotCom isn't designed to resolve a pet while its alt
+                # style is active - this always fails for a styled pet, regardless
+                # of whether its real appearance is modeled on DTI. Fall back to
+                # the alt style's own color rather than failing the whole fetch.
                 pass
 
         items: list[Item] = []
