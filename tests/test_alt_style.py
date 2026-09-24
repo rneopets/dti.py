@@ -206,11 +206,11 @@ async def test_fetch_neopet_alt_style_falls_back_when_real_color_unavailable(
     real_color_error: type[Exception],
 ) -> None:
     # a name was given (so the pet is presumed to exist, e.g. verified by the
-    # caller through some other means), but the pet's real appearance isn't
-    # modeled on DTI - common for a permanently-styled pet, since nobody ever sees
-    # (or submits) its real look, regardless of how common its actual color/species
-    # otherwise is. This must not fail the whole alt style fetch; it should fall
-    # back to the alt style's own color, same as when no name is given.
+    # caller through some other means), but petOnNeopetsDotCom isn't designed to
+    # resolve a pet while its alt style is active - this always fails for a styled
+    # pet, regardless of whether its real appearance is modeled on DTI. This must
+    # not fail the whole alt style fetch; it should fall back to the alt style's
+    # own color, same as when no name is given.
     async def fake_fetch(
         self: HTTPClient,
         species_id: int,
