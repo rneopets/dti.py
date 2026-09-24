@@ -369,6 +369,12 @@ class Client:
         responsibility; this method is for building the resulting appearance once you
         already know the species ID and alt style ID.
 
+        If `name` is supplied, it's used to look up the pet's real color from
+        Neopets.com (the same way :meth:`fetch_neopet_by_name` does), so `Neopet.color`
+        reflects the pet's actual color rather than the alt style's own associated
+        color. If omitted, `Neopet.color` falls back to the alt style's own color,
+        which may not match any specific pet.
+
         Parameters
         ----------
         species_id: :class:`int`
@@ -382,7 +388,8 @@ class Client:
             A list of item IDs to search for + add to the items of the Neopet. Only
             `body_id = 0` items are actually compatible with alt styles.
         name: Optional[:class:`str`]
-            The name of the Neopet, if one is supplied. Not verified against Neopets.com.
+            The name of the Neopet, if one is supplied. Also used to look up the pet's
+            real color from Neopets.com, see above.
         size: :class:`LayerImageSize`
             The desired size for the render. Defaults to `LayerImageSize.SIZE_600`.
 
@@ -390,6 +397,10 @@ class Client:
         ------
         ~dti.InvalidAltStyle
             The alt style ID does not exist for the given species.
+        ~dti.NeopetNotFound
+            `name` was supplied, but the Neopet is not found on Neopets.
+        ~dti.GlitchedNeopet
+            `name` was supplied, but the Neopet is glitched.
 
         Returns
         -------

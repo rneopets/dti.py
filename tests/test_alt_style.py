@@ -11,6 +11,25 @@ from dti.models import AltStyle
 
 if TYPE_CHECKING:
     from dti.client import Client
+    from dti.types import FetchedNeopetPayload
+
+# a real pet's petAppearance payload from PET_ON_NEOPETS, for species 31 (Lupe) -
+# a plain Strawberry Lupe, deliberately a different color than the "Aquatic
+# Maraquan" alt style catalog fixture uses, to prove the two stay decoupled.
+FETCHED_NEOPET_SPECIES_31: FetchedNeopetPayload = {
+    "petAppearance": {
+        "id": "1",
+        "petStateId": "1",
+        "pose": "HAPPY_MASC",
+        "bodyId": "0",
+        "isGlitched": False,
+        "color": {"id": "76", "name": "Strawberry"},
+        "species": {"id": "31", "name": "Lupe"},
+        "restrictedZones": [],
+        "layers": [],
+    },
+    "wornItems": [],
+}
 
 
 def test_alt_style_model(
@@ -125,7 +144,15 @@ async def test_fetch_neopet_alt_style(
     ) -> list[dict[str, Any]]:
         return alt_style_data_species_31
 
+    async def fake_fetch_neopet_by_name(
+        self: HTTPClient,
+        name: str,
+        size: object = None,
+    ) -> FetchedNeopetPayload:
+        return FETCHED_NEOPET_SPECIES_31
+
     monkeypatch.setattr(HTTPClient, "fetch_alt_styles_for_species", fake_fetch)
+    monkeypatch.setattr(HTTPClient, "fetch_neopet_by_name", fake_fetch_neopet_by_name)
     client._state._alt_styles.pop(31, None)
 
     neopet = await client.fetch_neopet_alt_style(
@@ -136,9 +163,37 @@ async def test_fetch_neopet_alt_style(
 
     assert neopet.alt_style is not None
     assert neopet.alt_style.id == 92370
+    assert neopet.alt_style.color_id == 44
     assert neopet.species.name == "Lupe"
     assert neopet.pose == PetPose.UNKNOWN
     assert "style=92370" in neopet.image_url
+
+    # the pet's real color must be preserved, not overwritten by the alt
+    # style's own associated color (Maraquan)
+    assert neopet.color.name == "Strawberry"
+    assert neopet.appearance.color.name == "Maraquan"
+
+
+@pytest.mark.asyncio()
+async def test_fetch_neopet_alt_style_without_name_falls_back(
+    client: Client,
+    alt_style_data_species_31: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_fetch(
+        self: HTTPClient,
+        species_id: int,
+    ) -> list[dict[str, Any]]:
+        return alt_style_data_species_31
+
+    monkeypatch.setattr(HTTPClient, "fetch_alt_styles_for_species", fake_fetch)
+    client._state._alt_styles.pop(31, None)
+
+    neopet = await client.fetch_neopet_alt_style(species_id=31, alt_style_id=92370)
+
+    # with no name given, there's no real pet to look up - color falls back to
+    # the alt style's own associated color
+    assert neopet.color.name == "Maraquan"
 
 
 @pytest.mark.asyncio()
@@ -157,7 +212,15 @@ async def test_neopet_render_includes_style_param(
     ) -> list[dict[str, Any]]:
         return alt_style_data_species_31
 
+    async def fake_fetch_neopet_by_name(
+        self: HTTPClient,
+        name: str,
+        size: object = None,
+    ) -> FetchedNeopetPayload:
+        return FETCHED_NEOPET_SPECIES_31
+
     monkeypatch.setattr(HTTPClient, "fetch_alt_styles_for_species", fake_fetch)
+    monkeypatch.setattr(HTTPClient, "fetch_neopet_by_name", fake_fetch_neopet_by_name)
     client._state._alt_styles.pop(31, None)
 
     neopet = await client.fetch_neopet_alt_style(
