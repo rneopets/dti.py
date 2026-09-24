@@ -20,7 +20,9 @@ from .errors import (
     GlitchedNeopet,
     InvalidAltStyle,
     InvalidColorSpeciesPair,
+    MissingModelData,
     MissingPetAppearance,
+    NeopetNotFound,
     NullAssetImage,
 )
 from .mixins import Object
@@ -1223,8 +1225,9 @@ class Neopet:
         way :meth:`_fetch_by_name` does - the alt style catalog itself has no concept of
         a specific pet, only the style's own internal `color_id` (used below for the
         item-fitting/bit lookups, which is unrelated to any specific pet's real color).
-        If `name` is omitted, `color` falls back to the alt style's own color, which may
-        not match any specific pet.
+        If `name` is omitted, or the pet's real color can't be looked up (it isn't
+        modeled on DTI outside of its alt style), `color` falls back to the alt style's
+        own color, which may not match any specific pet.
         """
 
         alt_style = await state.get_alt_style(  # type: ignore
@@ -1242,21 +1245,26 @@ class Neopet:
         color: Color = alt_style.appearance.color
 
         if name is not None:
-            pet_on_neo: FetchedNeopetPayload = await state.http.fetch_neopet_by_name(
-                name=name,
-                size=size,
-            )
+            try:
+                pet_on_neo: FetchedNeopetPayload = (
+                    await state.http.fetch_neopet_by_name(
+                        name=name,
+                        size=size,
+                    )
+                )
+                appearance_data = pet_on_neo["petAppearance"]
+            except (MissingModelData, NeopetNotFound):
+                appearance_data = None
 
-            appearance_data = pet_on_neo["petAppearance"]
-
-            if appearance_data is None:
-                # this pet is glitched by having a color that the species doesn't actually support
-                raise GlitchedNeopet
-
-            real_appearance = PetAppearance(
-                data=appearance_data, size=size, state=state
-            )
-            color = real_appearance.color
+            if appearance_data is not None:
+                real_appearance = PetAppearance(
+                    data=appearance_data, size=size, state=state
+                )
+                color = real_appearance.color
+            # else: the pet's real color isn't available (glitched, not modeled on
+            # DTI outside of its alt style, or not found) - this lookup is only a
+            # nice-to-have for `color`, so fall back to the alt style's own color
+            # rather than failing the whole alt style fetch
 
         items: list[Item] = []
         if item_ids or item_names:
