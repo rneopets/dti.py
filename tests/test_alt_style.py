@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from dti.enums import PetPose
+from dti.errors import MissingModelData, NeopetNotFound
 from dti.http import HTTPClient
 from dti.models import AltStyle
 
@@ -193,6 +194,50 @@ async def test_fetch_neopet_alt_style_without_name_falls_back(
 
     # with no name given, there's no real pet to look up - color falls back to
     # the alt style's own associated color
+    assert neopet.color.name == "Maraquan"
+
+
+@pytest.mark.parametrize("real_color_error", [MissingModelData, NeopetNotFound])
+@pytest.mark.asyncio()
+async def test_fetch_neopet_alt_style_falls_back_when_real_color_unavailable(
+    client: Client,
+    alt_style_data_species_31: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    real_color_error: type[Exception],
+) -> None:
+    # a name was given (so the pet is presumed to exist, e.g. verified by the
+    # caller through some other means), but the pet's real appearance isn't
+    # modeled on DTI - common for a permanently-styled pet, since nobody ever sees
+    # (or submits) its real look, regardless of how common its actual color/species
+    # otherwise is. This must not fail the whole alt style fetch; it should fall
+    # back to the alt style's own color, same as when no name is given.
+    async def fake_fetch(
+        self: HTTPClient,
+        species_id: int,
+    ) -> list[dict[str, Any]]:
+        return alt_style_data_species_31
+
+    async def fake_fetch_neopet_by_name_raises(
+        self: HTTPClient,
+        name: str,
+        size: object = None,
+    ) -> FetchedNeopetPayload:
+        raise real_color_error("real color unavailable")
+
+    monkeypatch.setattr(HTTPClient, "fetch_alt_styles_for_species", fake_fetch)
+    monkeypatch.setattr(
+        HTTPClient,
+        "fetch_neopet_by_name",
+        fake_fetch_neopet_by_name_raises,
+    )
+    client._state._alt_styles.pop(31, None)
+
+    neopet = await client.fetch_neopet_alt_style(
+        species_id=31,
+        alt_style_id=92370,
+        name="test_pet",
+    )
+
     assert neopet.color.name == "Maraquan"
 
 
