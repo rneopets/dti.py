@@ -1218,6 +1218,13 @@ class Neopet:
         `petAppearance` GraphQL field - alt styles don't have a queryable appearance of
         their own there, so the appearance is built entirely from the alt style catalog
         (see :meth:`State.get_alt_style`).
+
+        If `name` is given, it's used to look up the pet's real color by name, the same
+        way :meth:`_fetch_by_name` does - the alt style catalog itself has no concept of
+        a specific pet, only the style's own internal `color_id` (used below for the
+        item-fitting/bit lookups, which is unrelated to any specific pet's real color).
+        If `name` is omitted, `color` falls back to the alt style's own color, which may
+        not match any specific pet.
         """
 
         alt_style = await state.get_alt_style(  # type: ignore
@@ -1233,6 +1240,23 @@ class Neopet:
         size = size or LayerImageSize.SIZE_600
         species: Species = alt_style.appearance.species
         color: Color = alt_style.appearance.color
+
+        if name is not None:
+            pet_on_neo: FetchedNeopetPayload = await state.http.fetch_neopet_by_name(
+                name=name,
+                size=size,
+            )
+
+            appearance_data = pet_on_neo["petAppearance"]
+
+            if appearance_data is None:
+                # this pet is glitched by having a color that the species doesn't actually support
+                raise GlitchedNeopet
+
+            real_appearance = PetAppearance(
+                data=appearance_data, size=size, state=state
+            )
+            color = real_appearance.color
 
         items: list[Item] = []
         if item_ids or item_names:
