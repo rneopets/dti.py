@@ -1252,19 +1252,22 @@ class Neopet:
                         size=size,
                     )
                 )
-                appearance_data = pet_on_neo["petAppearance"]
-            except (MissingModelData, NeopetNotFound):
-                appearance_data = None
 
-            if appearance_data is not None:
+                appearance_data = pet_on_neo["petAppearance"]
+
+                if appearance_data is None:
+                    # this pet is glitched by having a color that the species doesn't actually support
+                    raise GlitchedNeopet
+
                 real_appearance = PetAppearance(
                     data=appearance_data, size=size, state=state
                 )
                 color = real_appearance.color
-            # else: the pet's real color isn't available (glitched, not modeled on
-            # DTI outside of its alt style, or not found) - this lookup is only a
-            # nice-to-have for `color`, so fall back to the alt style's own color
-            # rather than failing the whole alt style fetch
+            except (MissingModelData, GlitchedNeopet, NeopetNotFound):
+                # the pet's real color isn't available (not modeled on DTI outside
+                # of its alt style, glitched, or not found) - fall back to the alt
+                # style's own color rather than failing the whole alt style fetch
+                pass
 
         items: list[Item] = []
         if item_ids or item_names:
