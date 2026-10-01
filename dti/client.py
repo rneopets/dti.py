@@ -25,7 +25,7 @@ from .models import AltStyle, Color, Item, Neopet, Outfit, PetAppearance, Specie
 from .state import BitField, State
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from dti.types import (
         CanonicalAppearancePayload,

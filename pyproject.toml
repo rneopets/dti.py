@@ -3,7 +3,7 @@ name = "dti-py"
 version = "0.0.1"
 description = "A Python wrapper for the Dress To Impress API"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "httpx[brotli,http2,zstd]==0.28.1",
     "typing-extensions>=4.13.1",
@@ -12,7 +12,7 @@ license = { file = "LICENSE" }
 
 [tool.ruff]
 show-fixes = true
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 extend-select = [
@@ -47,7 +47,7 @@ exclude = [
 ]
 reportUnnecessaryTypeIgnoreComment = "warning"
 reportUnusedImport = "error"
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 typeCheckingMode = "basic"
 
 [dependency-groups]
