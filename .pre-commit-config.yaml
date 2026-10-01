@@ -14,7 +14,7 @@ repos:
     # Ruff version.
     rev: v0.16.9
     hooks:
-    -   id: ruff
+    -   id: ruff-check
         args: [--fix]
     -   id: ruff-format
 -   repo: https://gitlab.com/vojko.pribudic.foss/pre-commit-update
