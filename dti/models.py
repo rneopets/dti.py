@@ -1597,10 +1597,10 @@ class Outfit(Object):
         # for more info see https://discuss.python.org/t/parse-z-timezone-suffix-in-datetime/2220
         self.created_at: datetime.datetime = datetime.datetime.fromisoformat(
             data["createdAt"][:-1],
-        ).replace(tzinfo=datetime.timezone.utc)
+        ).replace(tzinfo=datetime.UTC)
         self.updated_at: datetime.datetime = datetime.datetime.fromisoformat(
             data["updatedAt"][:-1],
-        ).replace(tzinfo=datetime.timezone.utc)
+        ).replace(tzinfo=datetime.UTC)
 
     @property
     def legacy_url(self) -> str:
