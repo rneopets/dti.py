@@ -50,8 +50,19 @@ if TYPE_CHECKING:
 log: logging.Logger = logging.getLogger(__name__)
 
 
+class _RetryingTransport(httpx.AsyncHTTPTransport):
+    # httpx 0.28's AsyncHTTPTransport only forwards `retries` to the no-proxy
+    # connection pool - its proxy branch builds an AsyncHTTPProxy without it, so
+    # retries are silently dropped whenever a proxy is in use. Re-apply them to the
+    # underlying pool, which both branches (AsyncConnectionPool and AsyncHTTPProxy)
+    # support.
+    def __init__(self, *, retries: int = 0, proxy=None, **kwargs) -> None:
+        super().__init__(proxy=proxy, **kwargs)
+        self._pool._retries = retries
+
+
 class HTTPClient:
-    __slots__: tuple[str, ...] = ("_client", "_proxy", "_retries")
+    __slots__: tuple[str, ...] = ("_client",)
     API_BASE = "https://impress-2020.openneo.net/api"
     # alt style catalog data isn't served by DTI's GraphQL API - it's a plain REST
     # endpoint on the classic impress.openneo.net Rails app.
@@ -60,16 +71,15 @@ class HTTPClient:
     def __init__(
         self,
         *,
-        proxy: str | dict[str, str] | None = None,
+        proxy: str | None = None,
         retries: int = 3,
         timeout: float = 15.0,
     ) -> None:
-        self._proxy = proxy
-        self._retries = retries
+        # proxy and retries both go through the transport - passing `proxy=` directly
+        # to AsyncClient mounts a separate proxy transport that shadows this one (and
+        # is built without retries), silently dropping them.
         self._client: httpx.AsyncClient = httpx.AsyncClient(
-            proxy=proxy,  # type: ignore
-            transport=httpx.AsyncHTTPTransport(retries=retries),
-            limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
+            transport=_RetryingTransport(retries=retries, proxy=proxy),
             follow_redirects=True,
             # httpx defaults to a 5s timeout for every operation (connect/read/write/
             # pool), which is tight for callers chaining several sequential requests
