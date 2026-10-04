@@ -519,7 +519,7 @@ class Client:
         item_kind: Optional[:class:`ItemKind`]
             The desired kind of item you're trying to find. Can significantly reduce your search query.
         per_page: Optional[:class:`int`]
-            The desired amount of items per results-page. Defaults to 30. Only used when `query` is supplied with `species_id` and `color_id`.
+            The desired amount of items per results-page. Defaults to 30. Only used when `query` is supplied. Paginated searches also expose `total`, `num_pages` and `fetch_page`.
         item_name: Optional[:class:`str`]
             The name of one item to search for. Case sensitive, and must be an exact search. Invalid results will be `None`.
         item_names: Optional[List[:class:`str`]]
@@ -564,7 +564,12 @@ class Client:
         elif _names:
             searcher = ItemSearchNames(names=_names, state=self._state)
         elif query:
-            searcher = ItemSearch(query=query, item_kind=item_kind, state=self._state)
+            searcher = ItemSearch(
+                query=query,
+                item_kind=item_kind,
+                per_page=per_page,
+                state=self._state,
+            )
         elif item_ids:
             searcher = ItemIDSearch(item_ids=item_ids, state=self._state)
 

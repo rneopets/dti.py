@@ -28,6 +28,8 @@ class DTISearch(AsyncIterator[Item]):
         self._state = state
         self._items: Queue[Item] = Queue(maxsize=per_page or 0)
         self._exhausted = False
+        self.total: int | None = None
+        """The total number of results, once known. Only paginated searches populate this."""
 
     async def fetch_items(self) -> list[ItemPayload]:
         raise NotImplementedError
@@ -94,14 +96,40 @@ class PaginatedDTISearch(DTISearch):
         self.offset = 0
         self.per_page = 0
 
-    async def fetch_items(self) -> list[ItemPayload]:
+    async def _fetch_result(self, offset: int) -> dict[str, Any]:
+        # returns the `itemSearch` result, with `items` and `numTotalItems`
         raise NotImplementedError
+
+    async def _fetch_payloads(self, offset: int) -> list[ItemPayload]:
+        result = await self._fetch_result(offset)
+        self.total = result.get("numTotalItems", self.total)
+        return result["items"]
+
+    async def fetch_items(self) -> list[ItemPayload]:
+        return await self._fetch_payloads(self.offset)
+
+    @property
+    def num_pages(self) -> int | None:
+        """The total number of pages, or ``None`` until the first fetch."""
+        if self.total is None or self.per_page <= 0:
+            return None
+        return -(-self.total // self.per_page)
+
+    async def fetch_page(self, page: int) -> list[Item]:
+        """Fetches a single zero-indexed page without touching the iterator's position."""
+        if page < 0:
+            raise ValueError("page must be non-negative")
+
+        payloads = await self._fetch_payloads(page * self.per_page)
+        return [Item(data=item, state=self._state) for item in payloads if item]
 
     def post_fetch(self, items: Sequence[ItemPayload]) -> None:
         self.offset += self.per_page
 
         # when we find the last page, don't try another next time
-        self._exhausted = len(items) < self.per_page
+        self._exhausted = len(items) < self.per_page or (
+            self.total is not None and self.offset >= self.total
+        )
 
 
 class ItemSearchToFit(PaginatedDTISearch):
@@ -128,7 +156,7 @@ class ItemSearchToFit(PaginatedDTISearch):
         self.per_page = per_page
         self.size: LayerImageSize = size
 
-    async def fetch_items(self) -> list[ItemPayload]:
+    async def _fetch_result(self, offset: int) -> dict[str, Any]:
         fits_pet: dict[str, Any] = {
             "speciesId": self.species_id,
             "colorId": self.color_id,
@@ -145,12 +173,12 @@ class ItemSearchToFit(PaginatedDTISearch):
                 "altStyleId": self.alt_style_id,
                 "fitsPet": fits_pet,
                 "itemKind": str(self.item_kind) if self.item_kind else None,
-                "offset": self.offset,
+                "offset": offset,
                 "limit": self.per_page,
                 "size": str(self.size),
             },
         )
-        return data["data"]["itemSearch"]["items"]
+        return data["data"]["itemSearch"]
 
 
 class ItemSearchNames(DTISearch):
@@ -180,7 +208,7 @@ class ItemSearchNames(DTISearch):
         return [items]
 
 
-class ItemSearch(DTISearch):
+class ItemSearch(PaginatedDTISearch):
     # a regular search query
     def __init__(
         self,
@@ -188,17 +216,21 @@ class ItemSearch(DTISearch):
         state: State,
         query: str,
         item_kind: ItemKind | None = None,
+        per_page: int = 30,
     ) -> None:
-        super().__init__(state=state)
+        super().__init__(state=state, per_page=per_page)
         self.query = query
         self.item_kind = item_kind
+        self.per_page = per_page
 
-    async def fetch_items(self) -> list[ItemPayload]:
+    async def _fetch_result(self, offset: int) -> dict[str, Any]:
         data = await self._state.http._query(  # type: ignore
             query=SEARCH_QUERY,
             variables={
                 "query": self.query,
                 "itemKind": str(self.item_kind) if self.item_kind else None,
+                "offset": offset,
+                "limit": self.per_page,
             },
         )
-        return data["data"]["itemSearch"]["items"]
+        return data["data"]["itemSearch"]
