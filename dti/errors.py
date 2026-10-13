@@ -55,6 +55,10 @@ class NullAssetImage(DTIException):
     """An exception that is thrown when the biology/object image is null and must be reported to fix. Alternatively, the item does not have a PNG/SVG appearance, and only a Movie appearance."""
 
 
+class BrokenAssetImage(DTIException):
+    """An exception that is thrown when fetching an asset image (a layer, pet render, or outfit) fails on the HTTP side - e.g. a 404 or 5xx response instead of image bytes."""
+
+
 class InvalidItemID(DTIException):
     """An exception that is thrown when an invalid item ID is searched. The whole search query fails."""
 

@@ -22,6 +22,7 @@ from .constants import (
 )
 from .enums import LayerImageSize
 from .errors import (
+    BrokenAssetImage,
     HTTPException,
     InvalidColorSpeciesPair,
     MissingModelData,
@@ -124,6 +125,16 @@ class HTTPClient:
 
     async def _fetch_binary_data(self, url: str) -> bytes:
         response = await self._client.get(url)
+
+        if not response.is_success:
+            # a dead layer image / failed render returns an error page, and letting
+            # that through just crashes much later (e.g. PIL failing to parse HTML),
+            # far from the actual cause - fail here, with a typed error instead.
+            raise BrokenAssetImage(
+                f"Failed to fetch asset image from {url!r}: "
+                f"{response.status_code} {response.reason_phrase}",
+            )
+
         return response.read()
 
     async def fetch_appearance_by_id(
