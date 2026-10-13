@@ -54,6 +54,39 @@ async def test_neopet(client: Client, assets_data: dict[str, Any]) -> None:
 
 
 @pytest.mark.asyncio()
+async def test_appearance_layer_unknown_glitch(
+    client: Client,
+    assets_data: dict[str, Any],
+) -> None:
+    # regression: try_enum only caught TypeError, but an unknown glitch value raises
+    # ValueError (plain enum) - so a new glitch type from DTI would have crashed the
+    # parse of *every* layer of *every* appearance. It must fall back to the raw value.
+    from dti.models import AppearanceLayer
+
+    state = client._state
+    appearance = PetAppearance(
+        data=assets_data["data"]["petAppearance"],
+        size=LayerImageSize.SIZE_600,
+        state=state,
+    )
+
+    layer_data = dict(assets_data["data"]["petAppearance"]["layers"][0])
+    layer_data["knownGlitches"] = ["TOTALLY_NEW_GLITCH_TYPE"]
+
+    layer = AppearanceLayer(parent=appearance, data=layer_data)
+    assert layer.known_glitches == ["TOTALLY_NEW_GLITCH_TYPE"]
+
+    # and a known glitch still resolves to the enum
+    layer_data["knownGlitches"] = ["OFFICIAL_SWF_IS_INCORRECT"]
+    layer = AppearanceLayer(parent=appearance, data=layer_data)
+    from dti.enums import AppearanceLayerKnownGlitch
+
+    assert layer.known_glitches == [
+        AppearanceLayerKnownGlitch.OFFICIAL_SWF_IS_INCORRECT,
+    ]
+
+
+@pytest.mark.asyncio()
 async def test_neopet_render_layers(
     client: Client,
     assets_data: dict[str, Any],

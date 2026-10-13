@@ -85,8 +85,24 @@ class AppearanceLayerKnownGlitch(Enum):
 T = TypeVar("T")
 
 
-def try_enum(cls: type[T], val: Any) -> T:
+def try_enum(cls: type[T], val: Any) -> T | Any:
+    """Attempts to construct an enum member from ``val``, falling back to the raw value.
+
+    The fallback is what makes this "try": when DTI ships a new enum member we
+    haven't defined yet, we don't want to hard-crash - we just pass the raw value
+    through so callers can still render/report it.
+
+    Note that different enum base classes fail in different ways for an unknown
+    value, so we have to catch all of them:
+
+    - a plain :class:`enum.Enum` raises ``ValueError``
+    - :class:`_DTIEnum` overrides ``_missing_`` to do a name lookup (``cls[value]``),
+      which raises ``KeyError``
+
+    Catching only one of these (as an earlier version did with ``TypeError``, which
+    neither path raises) silently defeats the whole fallback.
+    """
     try:
         return cls(val)
-    except TypeError:
+    except (TypeError, ValueError, KeyError):
         return val

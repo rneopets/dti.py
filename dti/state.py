@@ -230,23 +230,24 @@ class State:
         async with self._lock:
             await self._update()
 
-    async def _fetch_species_and_color(self) -> None:
-        data = await self.http._query(query=ALL_SPECIES_AND_COLORS)  # type: ignore
-        data = data["data"]
+    async def _fetch_species_and_color(
+        self,
+    ) -> tuple[dict[str | int, Color], dict[str | int, Species]]:
+        # local import to avoid a circular dependency at module load time
         from .models import Color, Species
 
-        # colors
-        self._colors = _NameDict(
+        data = await self.http._query(query=ALL_SPECIES_AND_COLORS)  # type: ignore
+        data = data["data"]
+
+        colors: dict[str | int, Color] = _NameDict(
             {color["id"]: Color(data=color, state=self) for color in data["allColors"]},
         )
 
-        # species
-        self._species = _NameDict(
-            {
-                species["id"]: Species(data=species, state=self)
-                for species in data["allSpecies"]
-            },
+        species: dict[str | int, Species] = _NameDict(
+            {s["id"]: Species(data=s, state=self) for s in data["allSpecies"]},
         )
+
+        return colors, species
 
     @property
     def is_cached(self) -> bool:
@@ -301,12 +302,18 @@ class State:
             if not force and not self.is_outdated:
                 return self
 
+            # build the new species/color caches before touching the current ones,
+            # and swap them in as whole objects - clearing + repopulating (as this
+            # used to do) would leave a window where concurrent readers see a
+            # half-populated cache and fail with spurious InvalidSpecies/Color.
             self._valid_pairs = ValidField(await self.http._fetch_valid_pet_poses())  # type: ignore
             self._cached = False
-            self._colors.clear()
-            self._species.clear()
+
+            colors, species = await self._fetch_species_and_color()
+
+            self._colors = colors
+            self._species = species
             self._zones = None
-            await self._fetch_species_and_color()
 
             self._cached = True
             self._last_update = time.monotonic()
@@ -322,16 +329,26 @@ class State:
             return self._zones
 
     async def _ensure_alt_styles_cached(self, species_id: int) -> dict[int, AltStyle]:
+        # check/insert under the lock, but do the network fetch *outside* of it - otherwise
+        # the first styled-pet request for a species blocks every other cache access
+        # (species/color/bit lookups) for the whole REST round-trip. Two concurrent
+        # first-time callers may both fetch; that's acceptable for a rare, cached call.
         async with self._lock:
-            if species_id not in self._alt_styles:
-                from .models import AltStyle
+            cached = self._alt_styles.get(species_id)
 
-                data = await self.http.fetch_alt_styles_for_species(species_id)
-                self._alt_styles[species_id] = {
-                    int(entry["id"]): AltStyle(state=self, data=entry) for entry in data
-                }
+        if cached is not None:
+            return cached
 
-            return self._alt_styles[species_id]
+        from .models import AltStyle
+
+        data = await self.http.fetch_alt_styles_for_species(species_id)
+        styles: dict[int, AltStyle] = {
+            int(entry["id"]): AltStyle(state=self, data=entry) for entry in data
+        }
+
+        async with self._lock:
+            # another caller may have filled it while we were fetching - keep the existing one
+            return self._alt_styles.setdefault(species_id, styles)
 
     async def get_alt_style(
         self,
