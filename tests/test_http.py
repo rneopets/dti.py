@@ -76,3 +76,37 @@ class _FakeGet:
 
     async def __call__(self, *_args: object, **_kwargs: object) -> httpx.Response:
         return self.response
+
+
+@pytest.mark.asyncio()
+async def test_query_trims_payload() -> None:
+    # the query document is whitespace-collapsed (including a leading newline), and
+    # null variables are omitted, but falsy non-null values like 0 are kept.
+    client = HTTPClient()
+    sent: dict[str, object] = {}
+
+    async def fake_post(
+        _url: str, *, json: dict[str, object], **_kw: object
+    ) -> httpx.Response:
+        sent.update(json)
+        return httpx.Response(
+            200,
+            json={"data": {}},
+            request=httpx.Request("POST", "https://example.com/graphql"),
+        )
+
+    client._client.post = fake_post  # type: ignore[method-assign]
+    try:
+        await client._query(
+            "\nquery($a: Int) {\n  thing(a: $a) {\n    id\n  }\n}",
+            variables={"query": "x", "itemKind": None, "offset": 0, "limit": 30},
+        )
+        assert sent["query"] == "query($a: Int) { thing(a: $a) { id } }"
+        assert sent["variables"] == {"query": "x", "offset": 0, "limit": 30}
+
+        # all-null variables means no "variables" key at all
+        sent.clear()
+        await client._query("{ a }", variables={"x": None})
+        assert sent == {"query": "{ a }"}
+    finally:
+        await client.aclose()

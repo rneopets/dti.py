@@ -104,7 +104,12 @@ class HTTPClient:
         **kwargs: dict[str, Any],
     ) -> dict[Any, Any]:
         # for graphql queries
-        payload: dict[str, Any] = {"query": query}
+        # collapse the indentation/newlines in our query documents, they're dead weight on the wire
+        payload: dict[str, Any] = {"query": " ".join(query.split())}
+
+        # an omitted nullable variable is the same as an explicit null
+        if variables:
+            variables = {k: v for k, v in variables.items() if v is not None}
         if variables:
             payload["variables"] = variables
 
